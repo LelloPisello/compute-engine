@@ -19,17 +19,6 @@ ceResetInstanceCommands(CeInstance);
 void
 ceDestroyInstance(CeInstance);
 
-void*
-ceGetInstanceVulkanInstance(CeInstance);
-
-void*
-ceGetInstanceVulkanDevice(CeInstance);
-
-uint32_t
-ceGetInstanceVulkanQueueFamilyIndex(CeInstance);
-
-void*
-ceGetInstanceVulkanCommandPool(CeInstance);
 
 CeVulkanVersion
 ceGetVulkanVersion(void);

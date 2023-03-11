@@ -4,6 +4,7 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 #include <stdlib.h>
+#include "ce-instance-internal.h"
 
 struct CeCommand_t {
     VkQueue vulkanQueue;

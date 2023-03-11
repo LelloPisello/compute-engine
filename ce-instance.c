@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 #include <stdlib.h>
 #include <vulkan/vulkan_core.h>
+#include "ce-instance-internal.h"
 
 struct CeInstance_t {
     VkPhysicalDevice vulkanPhysicalDevice;
@@ -10,6 +11,7 @@ struct CeInstance_t {
     CeInstanceErrorCallback ceErrorCallback;
     VkDevice vulkanDevice;
     VkCommandPool vulkanCommandPool;
+    VkDescriptorPool vulkanDescriptorPool;
     uint32_t vulkanQueueFamily;
     uint32_t vulkanQueueCount;
     struct CeInstanceQueueList* queueListHead;
@@ -28,6 +30,7 @@ static VkResult __createVkCommandPool(CeInstance instance) {
     };
     return vkCreateCommandPool(instance->vulkanDevice, &commandInfo, NULL, &instance->vulkanCommandPool);
 }
+
 
 static VkResult __createVkInstance(CeInstance instance, const CeInstanceCreationArgs* args) {
     VkInstanceCreateInfo instanceCreateInfo =  {
@@ -149,12 +152,12 @@ void ceDestroyInstance(CeInstance instance) {
     free(instance);
 } 
 
-void*
+VkInstance
 ceGetInstanceVulkanInstance(CeInstance instance) {
     return instance->vulkanInstance;
 }   
 
-void*
+VkDevice
 ceGetInstanceVulkanDevice(CeInstance instance) {
     return instance->vulkanDevice;
 }
@@ -164,9 +167,14 @@ ceGetInstanceVulkanQueueFamilyIndex(CeInstance instance) {
     return instance->vulkanQueueFamily;
 }
 
-void*
+VkCommandPool
 ceGetInstanceVulkanCommandPool(CeInstance instance) {
     return instance->vulkanCommandPool;
+}
+
+VkPhysicalDevice
+ceGetInstanceVulkanPhysicalDevice(CeInstance instance) {
+    return instance->vulkanPhysicalDevice;
 }
 
 CeVulkanVersion
