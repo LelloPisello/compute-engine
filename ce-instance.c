@@ -6,11 +6,11 @@
 #include "ce-instance-internal.h"
 #include <string.h>
 //#define DEBUG
+#include "ce-error-internal.h"
 
 struct CeInstance_t {
     VkPhysicalDevice vulkanPhysicalDevice;
     VkInstance vulkanInstance;
-    CeInstanceErrorCallback ceErrorCallback;
     VkDevice vulkanDevice;
     VkCommandPool vulkanCommandPool;
     VkDescriptorPool vulkanDescriptorPool;
@@ -173,7 +173,6 @@ CeResult ceCreateInstance(const CeInstanceCreationArgs * args, CeInstance *insta
         return CE_ERROR_NULL_PASSED;
 
     *instance = malloc(sizeof(struct CeInstance_t));
-    (*instance)->ceErrorCallback = args->pErrorCallback;
     if(__createVkInstance(*instance, args) != VK_SUCCESS)
         return CE_ERROR_INTERNAL;
     if(__createVkDeviceSingle(*instance) != VK_SUCCESS)
@@ -188,7 +187,7 @@ CeResult ceCreateInstance(const CeInstanceCreationArgs * args, CeInstance *insta
 
 
     if(__createVkCommandPool(*instance) != VK_SUCCESS)
-        return CE_ERROR_INTERNAL;
+        return ceResult(CE_ERROR_INTERNAL);
     return CE_SUCCESS;
 }
 

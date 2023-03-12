@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include "ce-instance-internal.h"
 #include "ce-pipeline-internal.h"
+#include "ce-error-internal.h"
 
 struct CeCommand_t {
     VkQueue vulkanQueue;
@@ -18,6 +19,12 @@ struct CeCommand_t {
 
 CeResult 
 ceRecordToCommand(const CeCommandRecordingArgs * args, CeCommand command) {
+    if(!args || !command)
+        return ceResult(CE_ERROR_NULL_PASSED);
+    if(!args->bRecordCommand && !args->pSuppliedPipeline) 
+        return ceResult(CE_ERROR_INVALID_ARG);
+    if(args->bRecordCommand && !args->pSuppliedCommand)
+        return ceResult(CE_ERROR_INVALID_ARG);
     if(args->bRecordCommand) {
         vkCmdExecuteCommands(command->commandBuffer, 1, &args->pSuppliedCommand->commandBuffer);
     } else {
@@ -38,6 +45,9 @@ ceRecordToCommand(const CeCommandRecordingArgs * args, CeCommand command) {
 
 CeResult
 ceCreateCommand(CeInstance instance, const CeCommandCreationArgs* args, CeCommand* target) {
+    if(!instance || !args || !target)
+        return ceResult(CE_ERROR_NULL_PASSED);
+
     *target = malloc(sizeof(struct CeCommand_t));
     (*target)->vulkanQueueIndex = ceGetInstanceNextFreeQueue(instance);
     ceSetInstanceQueueToBusy(instance, (*target)->vulkanQueueIndex);
@@ -51,7 +61,7 @@ ceCreateCommand(CeInstance instance, const CeCommandCreationArgs* args, CeComman
     };
 
     if(vkCreateFence(ceGetInstanceVulkanDevice(instance), &fenceInfo, NULL, &(*target)->commandFence) != VK_SUCCESS)
-        return CE_ERROR_INTERNAL;
+        return ceResult(CE_ERROR_INTERNAL);
 
     VkCommandBufferAllocateInfo allocInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -62,7 +72,7 @@ ceCreateCommand(CeInstance instance, const CeCommandCreationArgs* args, CeComman
     };
     
     if(vkAllocateCommandBuffers(ceGetInstanceVulkanDevice(instance), &allocInfo, &(*target)->commandBuffer) != VK_SUCCESS) {
-        return CE_ERROR_INTERNAL;
+        return ceResult(CE_ERROR_INTERNAL);
     }    
     return CE_SUCCESS;
 }
@@ -70,14 +80,14 @@ ceCreateCommand(CeInstance instance, const CeCommandCreationArgs* args, CeComman
 CeResult 
 ceRunCommand(CeCommand command) {
     if(!command)
-        return CE_ERROR_NULL_PASSED;
+        return ceResult(CE_ERROR_NULL_PASSED);
     VkSubmitInfo subInfo = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .commandBufferCount = 1,
         .pCommandBuffers = &command->commandBuffer
     };
     if(vkQueueSubmit(command->vulkanQueue, 1, &subInfo, command->commandFence) != VK_SUCCESS)
-        return CE_ERROR_INTERNAL;
+        return ceResult(CE_ERROR_INTERNAL);
     return CE_SUCCESS;
 }
 
@@ -88,34 +98,34 @@ ceBeginCommand(CeCommand command) {
         .flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
     };
     if(vkBeginCommandBuffer(command->commandBuffer, &beginInfo))
-        return CE_ERROR_INTERNAL;
+        return ceResult(CE_ERROR_INTERNAL);
     return CE_SUCCESS;
 }
 
 CeResult 
 ceEndCommand(CeCommand command) {
     if(!command)
-        return CE_ERROR_NULL_PASSED;
+        return ceResult(CE_ERROR_NULL_PASSED);
     if(vkEndCommandBuffer(command->commandBuffer) != VK_SUCCESS)
-        return CE_ERROR_INTERNAL;
+        return ceResult(CE_ERROR_INTERNAL);
     return CE_SUCCESS;
 }
 
 CeResult
 ceWaitCommand(CeInstance instance, CeCommand command) {
     if(!instance || !command)
-        return CE_ERROR_NULL_PASSED;
+        return ceResult(CE_ERROR_NULL_PASSED);
     
     if(vkWaitForFences(ceGetInstanceVulkanDevice(instance), 1, &command->commandFence, VK_TRUE, (uint64_t)-1))
-        return CE_ERROR_INTERNAL;
+        return ceResult(CE_ERROR_INTERNAL);
     return CE_SUCCESS;
 }
 
 CeResult ceResetCommand(CeCommand command) {
     if(!command)
-        return CE_ERROR_NULL_PASSED;
+        return ceResult(CE_ERROR_NULL_PASSED);
     if(vkResetCommandBuffer(command->commandBuffer, 0))
-        return CE_ERROR_INTERNAL;
+        return ceResult(CE_ERROR_INTERNAL);
     return CE_SUCCESS;
 }
 

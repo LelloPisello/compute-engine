@@ -11,3 +11,9 @@ VkDescriptorSet ceGetPipelineVulkanDescriptorSet(CePipeline);
 VkPipelineLayout ceGetPipelineVulkanPipelineLayout(CePipeline);
 
 uint32_t ceGetPipelineLongestBufferSize(CePipeline);
+
+CeResult
+ceSetInstanceQueueToBusy(CeInstance, uint32_t queueIndex);
+
+CeResult
+ceSetInstanceQueueToFree(CeInstance, uint32_t queueIndex);

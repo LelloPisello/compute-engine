@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include "ce-instance-internal.h"
 #include "ce-pipeline-internal.h"
+#include "ce-error-internal.h"
 
 struct CePipeline_t { 
     VkPipeline vulkanFinishedPipeline;
@@ -253,7 +254,7 @@ static VkResult __createVkPipeline(CeInstance instance, CePipeline pipeline) {
 CeResult ceCreatePipeline(CeInstance instance, const CePipelineCreationArgs * args, CePipeline * pipeline) {
 #define ALIAS (*pipeline)
     if(!instance || !args || !pipeline)
-        return CE_ERROR_NULL_PASSED;
+        return ceResult(CE_ERROR_NULL_PASSED);
         
     ALIAS = calloc(1, sizeof(struct CePipeline_t));
     ALIAS->bufferCount = args->uPipelineBindingCount;
@@ -267,7 +268,7 @@ CeResult ceCreatePipeline(CeInstance instance, const CePipelineCreationArgs * ar
         __createVkDescriptorSet(instance, args, ALIAS) ||
         __createVkPipelineLayoutAndCache(instance, ALIAS) ||
         __createVkPipeline(instance, ALIAS))
-        return CE_ERROR_INTERNAL;
+        return ceResult(CE_ERROR_INTERNAL);
     return CE_SUCCESS;
 #undef ALIAS
 }
