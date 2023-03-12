@@ -20,10 +20,7 @@ CeResult
 ceBeginCommand(CeCommand);
 
 CeResult
-ceRecordSCommandToCommand(CeCommand secondary, CeCommand primary);
-
-CeResult
-ceRecordPipelineToCommand(CePipeline, CeCommand);
+ceRecordToCommand(const CeCommandRecordingArgs*, CeCommand);
 
 CeResult
 ceEndCommand(CeCommand);

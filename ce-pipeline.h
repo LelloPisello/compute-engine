@@ -20,10 +20,10 @@ CeResult
 ceCreatePipeline(CeInstance, const CePipelineCreationArgs*, CePipeline*);
 
 CeResult
-ceMapPipelineBindingMemory(CePipeline, uint32_t bindingIndex, void**);
+ceMapPipelineBindingMemory(CeInstance, CePipeline, uint32_t bindingIndex, void**);
 
-CeResult
-ceUnmapPipelineBindingMemory(CePipeline, uint32_t bindingIndex);
+void
+ceUnmapPipelineBindingMemory(CeInstance, CePipeline, uint32_t bindingIndex);
 
 void
 ceDestroyPipeline(CeInstance, CePipeline);

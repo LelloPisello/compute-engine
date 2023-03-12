@@ -5,6 +5,7 @@
 #include <vulkan/vulkan_core.h>
 #include <stdlib.h>
 #include "ce-instance-internal.h"
+#include "ce-pipeline-internal.h"
 
 struct CePipeline_t { 
     VkPipeline vulkanFinishedPipeline;
@@ -16,8 +17,26 @@ struct CePipeline_t {
     VkDescriptorSet vulkanDescriptorSet;
     VkBuffer *vulkanBuffers;
     VkDeviceMemory *vulkanBufferMemory;
+    VkDeviceSize *vulkanBufferMemorySize;
     uint32_t bufferCount;
+    uint32_t longestBufferSize;
 };
+
+VkPipeline ceGetPipelineVulkanPipeline(CePipeline pipeline) {
+    return pipeline->vulkanFinishedPipeline;
+}
+
+VkDescriptorSet ceGetPipelineVulkanDescriptorSet(CePipeline pipeline) {
+    return pipeline->vulkanDescriptorSet;
+}
+
+VkPipelineLayout ceGetPipelineVulkanPipelineLayout(CePipeline pipeline) {
+    return pipeline->vulkanPipelineLayout;
+}
+
+uint32_t ceGetPipelineLongestBufferSize(CePipeline pipeline) {
+    return pipeline->longestBufferSize;
+}
 
 #include <stdio.h>
 
@@ -27,9 +46,13 @@ static VkResult __createVkBuffersFromBindings(CeInstance instance, const CePipel
     uint32_t familyIndex = ceGetInstanceVulkanQueueFamilyIndex(instance);
     pipeline->vulkanBuffers = calloc(pipeline->bufferCount, sizeof(VkBuffer));
     for(uint32_t i = 0; i < pipeline->bufferCount; ++i) {
+        pipeline->longestBufferSize = 
+            pipeline->longestBufferSize < args->pPipelineBindings[i].uBindingElementCount ? 
+            args->pPipelineBindings[i].uBindingElementCount :
+            pipeline->longestBufferSize;
         bufferInfos[i].size = args->pPipelineBindings[i].uBindingElementCount * args->pPipelineBindings[i].uBindingElementSize;
         bufferInfos[i].usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-        bufferInfos[i].sharingMode = VK_SHARING_MODE_CONCURRENT;
+        bufferInfos[i].sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         bufferInfos[i].queueFamilyIndexCount = 1;
         bufferInfos[i].pQueueFamilyIndices = &familyIndex;
         bufferInfos[i].sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -80,6 +103,20 @@ static VkResult __createVkBuffersFromBindings(CeInstance instance, const CePipel
     free(memoryRequirements);
     free(bufferInfos);
     return VK_SUCCESS;  
+}
+
+CeResult
+ceMapPipelineBindingMemory(CeInstance instance, CePipeline pipeline, uint32_t bindingIndex, void** target) {
+    if(vkMapMemory(ceGetInstanceVulkanDevice(instance),
+    pipeline->vulkanBufferMemory[bindingIndex], 0, pipeline->vulkanBufferMemorySize[bindingIndex], 
+    0, target) != CE_SUCCESS)
+        return CE_ERROR_INTERNAL;
+    return CE_SUCCESS;
+}
+
+void
+ceUnmapPipelineBindingMemory(CeInstance instance, CePipeline pipeline, uint32_t bindingIndex) {
+    vkUnmapMemory(ceGetInstanceVulkanDevice(instance), pipeline->vulkanBufferMemory[bindingIndex]);
 }
 
 static VkResult __createVkDescriptorPool(CeInstance instance, CePipeline pipeline) {
@@ -198,8 +235,21 @@ static VkResult __createVkPipelineLayoutAndCache(CeInstance instance, CePipeline
     return result;
 }
 
-static VkResult __createVkPipeline(CePipeline pipeline) {
-    return VK_SUCCESS;
+static VkResult __createVkPipeline(CeInstance instance, CePipeline pipeline) {
+    VkPipelineShaderStageCreateInfo shaderInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+        .module = pipeline->vulkanShader,
+        .pName = "main",
+    };
+    VkComputePipelineCreateInfo pipeInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .layout = pipeline->vulkanPipelineLayout,
+        .stage = shaderInfo,
+    };
+    return vkCreateComputePipelines(ceGetInstanceVulkanDevice(instance),
+    pipeline->vulkanPipelineCache, 1, &pipeInfo, 
+    NULL, &pipeline->vulkanFinishedPipeline);
 }
 
 CeResult ceCreatePipeline(CeInstance instance, const CePipelineCreationArgs * args, CePipeline * pipeline) {
@@ -209,6 +259,7 @@ CeResult ceCreatePipeline(CeInstance instance, const CePipelineCreationArgs * ar
         
     ALIAS = calloc(1, sizeof(struct CePipeline_t));
     ALIAS->bufferCount = args->uPipelineBindingCount;
+    ALIAS->longestBufferSize = 0;
 
     if(
         __createVkBuffersFromBindings(instance, args, ALIAS) ||
@@ -217,7 +268,7 @@ CeResult ceCreatePipeline(CeInstance instance, const CePipelineCreationArgs * ar
         __createVkDescriptorSetLayout(instance, ALIAS, args) ||
         __createVkDescriptorSet(instance, args, ALIAS) ||
         __createVkPipelineLayoutAndCache(instance, ALIAS) ||
-        __createVkPipeline(ALIAS))
+        __createVkPipeline(instance, ALIAS))
         return CE_ERROR_INTERNAL;
     return CE_SUCCESS;
 #undef ALIAS

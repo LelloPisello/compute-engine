@@ -1,10 +1,12 @@
 #include "ce-command.h"
 #include "ce-def.h"
 #include "ce-instance.h"
+#include <stdint.h>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 #include <stdlib.h>
 #include "ce-instance-internal.h"
+#include "ce-pipeline-internal.h"
 
 struct CeCommand_t {
     VkQueue vulkanQueue;
@@ -12,6 +14,27 @@ struct CeCommand_t {
     VkFence commandFence;
     uint32_t vulkanQueueIndex;
 };
+
+
+CeResult 
+ceRecordToCommand(const CeCommandRecordingArgs * args, CeCommand command) {
+    if(args->bRecordCommand) {
+        vkCmdExecuteCommands(command->commandBuffer, 1, &args->pSuppliedCommand->commandBuffer);
+    } else {
+        VkDescriptorSet target = ceGetPipelineVulkanDescriptorSet(args->pSuppliedPipeline);
+        vkCmdBindPipeline(command->commandBuffer,
+        VK_PIPELINE_BIND_POINT_COMPUTE, ceGetPipelineVulkanPipeline(args->pSuppliedPipeline));
+
+        vkCmdBindDescriptorSets(command->commandBuffer,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        ceGetPipelineVulkanPipelineLayout(args->pSuppliedPipeline), 0, 1, 
+        &target, 0, NULL);
+
+        vkCmdDispatch(command->commandBuffer, 
+        ceGetPipelineLongestBufferSize(args->pSuppliedPipeline), 1, 1);
+    }
+    return CE_SUCCESS;
+}
 
 CeResult
 ceCreateCommand(CeInstance instance, const CeCommandCreationArgs* args, CeCommand* target) {
@@ -83,7 +106,7 @@ ceWaitCommand(CeInstance instance, CeCommand command) {
     if(!instance || !command)
         return CE_ERROR_NULL_PASSED;
     
-    if(vkWaitForFences(ceGetInstanceVulkanDevice(instance), 1, &command->commandFence, VK_TRUE, 1000))
+    if(vkWaitForFences(ceGetInstanceVulkanDevice(instance), 1, &command->commandFence, VK_TRUE, (uint64_t)-1))
         return CE_ERROR_INTERNAL;
     return CE_SUCCESS;
 }
