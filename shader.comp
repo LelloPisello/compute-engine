@@ -1,4 +1,5 @@
 #version 450
+layout(local_size_x = 1) in;
 
 layout (binding = 0) buffer INPUT {
     int INdata[];
@@ -8,5 +9,5 @@ layout (binding = 1) buffer OUT {
 };
 
 void main() {
-    
+    OUTdata[gl_GlobalInvocationID.x] = int(gl_GlobalInvocationID.x);
 }
