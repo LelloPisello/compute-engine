@@ -1,11 +1,10 @@
 #version 450
 
-layout(binding = 0) buffer inputBuffer {
-    int inputData[];
+layout (binding = 0) buffer INPUT {
+    int INdata[];
 };
-
-layout(binding = 1) buffer outputBuffer {
-    int outputData[];
+layout (binding = 1) buffer OUT {
+    int OUTdata[];
 };
 
 void main() {

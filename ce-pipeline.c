@@ -42,32 +42,18 @@ uint32_t ceGetPipelineLongestBufferSize(CePipeline pipeline) {
 
 static VkResult __createVkBuffersFromBindings(CeInstance instance, const CePipelineCreationArgs* args, CePipeline pipeline) {
     pipeline->bufferCount = args->uPipelineBindingCount;
-    VkBufferCreateInfo *bufferInfos = calloc(pipeline->bufferCount, sizeof(VkBufferCreateInfo));
+
+    //VkBufferCreateInfo *bufferInfos = calloc(pipeline->bufferCount, sizeof(VkBufferCreateInfo));
     uint32_t familyIndex = ceGetInstanceVulkanQueueFamilyIndex(instance);
     pipeline->vulkanBuffers = calloc(pipeline->bufferCount, sizeof(VkBuffer));
-    for(uint32_t i = 0; i < pipeline->bufferCount; ++i) {
-        pipeline->longestBufferSize = 
-            pipeline->longestBufferSize < args->pPipelineBindings[i].uBindingElementCount ? 
-            args->pPipelineBindings[i].uBindingElementCount :
-            pipeline->longestBufferSize;
-        bufferInfos[i].size = args->pPipelineBindings[i].uBindingElementCount * args->pPipelineBindings[i].uBindingElementSize;
-        bufferInfos[i].usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-        bufferInfos[i].sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        bufferInfos[i].queueFamilyIndexCount = 1;
-        bufferInfos[i].pQueueFamilyIndices = &familyIndex;
-        bufferInfos[i].sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        vkCreateBuffer(ceGetInstanceVulkanDevice(instance), &bufferInfos[i], NULL, &pipeline->vulkanBuffers[i]);
-    }
-
-    VkMemoryRequirements *memoryRequirements = calloc(args->uPipelineBindingCount, sizeof(VkMemoryRequirements));
-    for(uint32_t i = 0; i < pipeline->bufferCount; ++i) {
-        vkGetBufferMemoryRequirements(ceGetInstanceVulkanDevice(instance), pipeline->vulkanBuffers[i], memoryRequirements + i);
-    }
+    pipeline->vulkanBufferMemory = calloc(pipeline->bufferCount, sizeof(VkDeviceMemory));
+    pipeline->vulkanBufferMemorySize = calloc(pipeline->bufferCount, sizeof(VkDeviceSize));
 
     VkPhysicalDeviceMemoryProperties memoryProperties;
     vkGetPhysicalDeviceMemoryProperties(ceGetInstanceVulkanPhysicalDevice(instance), &memoryProperties);
     uint32_t MemoryTypeIndex = ~((uint32_t)0);
     VkDeviceSize MemoryHeapSize = ~((uint32_t)0);
+
     for (uint32_t CurrentMemoryTypeIndex = 0; CurrentMemoryTypeIndex < memoryProperties.memoryTypeCount; ++CurrentMemoryTypeIndex)
     {
         VkMemoryType MemoryType = memoryProperties.memoryTypes[CurrentMemoryTypeIndex];
@@ -80,28 +66,40 @@ static VkResult __createVkBuffersFromBindings(CeInstance instance, const CePipel
         }
     }
 
-    VkMemoryAllocateInfo *allocInfos = calloc( args->uPipelineBindingCount, sizeof(VkMemoryAllocateInfo));
-    pipeline->vulkanBufferMemory = calloc(args->uPipelineBindingCount, sizeof(VkDeviceMemory));
-    for(uint32_t i = 0; i < args->uPipelineBindingCount; ++i) {
-        allocInfos[i].allocationSize = memoryRequirements[i].size;
-        allocInfos[i].pNext = NULL;
-        allocInfos[i].sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfos[i].memoryTypeIndex = MemoryTypeIndex;
-        vkAllocateMemory(ceGetInstanceVulkanDevice(instance), allocInfos + i, NULL, &pipeline->vulkanBufferMemory[i]);
-    
-        char* data;
-        vkMapMemory(ceGetInstanceVulkanDevice(instance), pipeline->vulkanBufferMemory[i], 0, memoryRequirements[i].size, 0, (void**)&data);
-        *data = 0;
-        vkUnmapMemory(ceGetInstanceVulkanDevice(instance), pipeline->vulkanBufferMemory[i]);
-
-        vkBindBufferMemory(ceGetInstanceVulkanDevice(instance), pipeline->vulkanBuffers[i], pipeline->vulkanBufferMemory[i], 0);
+    for(uint32_t i = 0; i < pipeline->bufferCount; ++i) {
+        pipeline->vulkanBufferMemorySize[i] = args->pPipelineBindings[i].uBindingElementCount * args->pPipelineBindings[i].uBindingElementSize;
+        VkBufferCreateInfo bufferInfo = {
+            .size = pipeline->vulkanBufferMemorySize[i],
+            .pQueueFamilyIndices = &familyIndex,
+            .queueFamilyIndexCount = 1,
+            .sharingMode = VK_SHARING_MODE_CONCURRENT,
+            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+        };
+        
+        pipeline->longestBufferSize = 
+            pipeline->longestBufferSize < args->pPipelineBindings[i].uBindingElementCount ? 
+            args->pPipelineBindings[i].uBindingElementCount :
+            pipeline->longestBufferSize;
+        /*bufferInfos[i].pNext = NULL;
+        bufferInfos[i].size = args->pPipelineBindings[i].uBindingElementCount * args->pPipelineBindings[i].uBindingElementSize;
+        bufferInfos[i].usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        bufferInfos[i].sharingMode = VK_SHARING_MODE_CONCURRENT;
+        bufferInfos[i].queueFamilyIndexCount = 1;
+        bufferInfos[i].pQueueFamilyIndices = &familyIndex;
+        bufferInfos[i].sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;*/
+        vkCreateBuffer(ceGetInstanceVulkanDevice(instance), &bufferInfo, NULL, &pipeline->vulkanBuffers[i]);
+        VkMemoryRequirements memoryRequirements;
+        vkGetBufferMemoryRequirements(ceGetInstanceVulkanDevice(instance), pipeline->vulkanBuffers[i], &memoryRequirements);
+        VkMemoryAllocateInfo allocInfo = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .allocationSize = memoryRequirements.size,
+            .memoryTypeIndex = MemoryTypeIndex
+        };
+        vkAllocateMemory(ceGetInstanceVulkanDevice(instance), &allocInfo, NULL, &pipeline->vulkanBufferMemory[i]);
     }
-
     
-
-    free(allocInfos);
-    free(memoryRequirements);
-    free(bufferInfos);
+    //free(bufferInfos);
     return VK_SUCCESS;  
 }
 
@@ -281,6 +279,7 @@ void ceDestroyPipeline(CeInstance instance, CePipeline pipeline) {
     }
     free(pipeline->vulkanBuffers);
     free(pipeline->vulkanBufferMemory);
+    free(pipeline->vulkanBufferMemorySize);
     vkFreeDescriptorSets(ceGetInstanceVulkanDevice(instance), pipeline->vulkanDescriptorPool, 1, &pipeline->vulkanDescriptorSet);
     vkDestroyDescriptorSetLayout(ceGetInstanceVulkanDevice(instance), pipeline->vulkanDescriptorSetLayout, NULL);
     vkDestroyDescriptorPool(ceGetInstanceVulkanDevice(instance), pipeline->vulkanDescriptorPool, NULL);
