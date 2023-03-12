@@ -22,22 +22,22 @@ struct CePipeline_t {
 #include <stdio.h>
 
 static VkResult __createVkBuffersFromBindings(CeInstance instance, const CePipelineCreationArgs* args, CePipeline pipeline) {
-    VkBufferCreateInfo *bufferInfos = calloc(args->uPipelineBindingCount, sizeof(VkBufferCreateInfo));
+    pipeline->bufferCount = args->uPipelineBindingCount;
+    VkBufferCreateInfo *bufferInfos = calloc(pipeline->bufferCount, sizeof(VkBufferCreateInfo));
     uint32_t familyIndex = ceGetInstanceVulkanQueueFamilyIndex(instance);
-    pipeline->vulkanBuffers = calloc(args->uPipelineBindingCount, sizeof(VkBuffer));
-    pipeline->bufferCount =  args->uPipelineBindingCount;
-    for(uint32_t i = 0; i < args->uPipelineBindingCount; ++i) {
+    pipeline->vulkanBuffers = calloc(pipeline->bufferCount, sizeof(VkBuffer));
+    for(uint32_t i = 0; i < pipeline->bufferCount; ++i) {
         bufferInfos[i].size = args->pPipelineBindings[i].uBindingElementCount * args->pPipelineBindings[i].uBindingElementSize;
         bufferInfos[i].usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-        bufferInfos[i].sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        bufferInfos[i].sharingMode = VK_SHARING_MODE_CONCURRENT;
         bufferInfos[i].queueFamilyIndexCount = 1;
         bufferInfos[i].pQueueFamilyIndices = &familyIndex;
         bufferInfos[i].sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        vkCreateBuffer(ceGetInstanceVulkanDevice(instance), bufferInfos + i, NULL, &pipeline->vulkanBuffers[i]);
+        vkCreateBuffer(ceGetInstanceVulkanDevice(instance), &bufferInfos[i], NULL, &pipeline->vulkanBuffers[i]);
     }
 
-    VkMemoryRequirements *memoryRequirements = malloc(sizeof(VkMemoryRequirements) * args->uPipelineBindingCount);
-    for(uint32_t i = 0; i < args->uPipelineBindingCount; ++i) {
+    VkMemoryRequirements *memoryRequirements = calloc(args->uPipelineBindingCount, sizeof(VkMemoryRequirements));
+    for(uint32_t i = 0; i < pipeline->bufferCount; ++i) {
         vkGetBufferMemoryRequirements(ceGetInstanceVulkanDevice(instance), pipeline->vulkanBuffers[i], memoryRequirements + i);
     }
 
@@ -58,12 +58,19 @@ static VkResult __createVkBuffersFromBindings(CeInstance instance, const CePipel
     }
 
     VkMemoryAllocateInfo *allocInfos = calloc( args->uPipelineBindingCount, sizeof(VkMemoryAllocateInfo));
-    pipeline->vulkanBufferMemory = malloc(sizeof(VkDeviceMemory) * args->uPipelineBindingCount);
+    pipeline->vulkanBufferMemory = calloc(args->uPipelineBindingCount, sizeof(VkDeviceMemory));
     for(uint32_t i = 0; i < args->uPipelineBindingCount; ++i) {
         allocInfos[i].allocationSize = memoryRequirements[i].size;
+        allocInfos[i].pNext = NULL;
         allocInfos[i].sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfos[i].memoryTypeIndex = MemoryTypeIndex;
         vkAllocateMemory(ceGetInstanceVulkanDevice(instance), allocInfos + i, NULL, &pipeline->vulkanBufferMemory[i]);
+    
+        char* data;
+        vkMapMemory(ceGetInstanceVulkanDevice(instance), pipeline->vulkanBufferMemory[i], 0, memoryRequirements[i].size, 0, (void**)&data);
+        *data = 0;
+        vkUnmapMemory(ceGetInstanceVulkanDevice(instance), pipeline->vulkanBufferMemory[i]);
+
         vkBindBufferMemory(ceGetInstanceVulkanDevice(instance), pipeline->vulkanBuffers[i], pipeline->vulkanBufferMemory[i], 0);
     }
 
@@ -75,15 +82,17 @@ static VkResult __createVkBuffersFromBindings(CeInstance instance, const CePipel
     return VK_SUCCESS;  
 }
 
-static VkResult __createVkDescriptorPool(CeInstance instance, CePipeline pipeline, const CePipelineCreationArgs* args) {
+static VkResult __createVkDescriptorPool(CeInstance instance, CePipeline pipeline) {
     VkDescriptorPoolSize poolSize = {
-        .descriptorCount = args->uPipelineBindingCount,
+        .descriptorCount = pipeline->bufferCount,
         .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
     };
     VkDescriptorPoolCreateInfo poolInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .poolSizeCount = 1,
+        .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
         .pPoolSizes = &poolSize,
+        .maxSets = 1
     };
     return vkCreateDescriptorPool(ceGetInstanceVulkanDevice(instance), &poolInfo, NULL, &pipeline->vulkanDescriptorPool);
 }
@@ -116,12 +125,12 @@ static VkResult __createVkShaderModule(CeInstance instance, CePipeline pipeline,
 }
 
 static VkResult __createVkDescriptorSetLayout(CeInstance instance, CePipeline pipeline, const CePipelineCreationArgs* args) {
-    VkDescriptorSetLayoutBinding *bindings = malloc(sizeof(VkDescriptorSetLayoutBinding) * args->uPipelineBindingCount);
+    VkDescriptorSetLayoutBinding *bindings = calloc(args->uPipelineBindingCount, sizeof(VkDescriptorSetLayoutBinding));
     for(uint32_t i = 0; i < args->uPipelineBindingCount; ++i) {
         bindings[i].binding = i;
         bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         bindings[i].descriptorCount = 1;
-        bindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        bindings[i].stageFlags = VK_SHADER_STAGE_ALL;
     }
     VkDescriptorSetLayoutCreateInfo layoutInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -142,29 +151,35 @@ static VkResult __createVkDescriptorSet(CeInstance instance, const CePipelineCre
     };
     VkResult result = vkAllocateDescriptorSets(ceGetInstanceVulkanDevice(instance), &setInfo, &pipeline->vulkanDescriptorSet);
     
-    VkDescriptorBufferInfo *buffers = calloc(args->uPipelineBindingCount, sizeof(VkDescriptorBufferInfo));
-    for(uint32_t i = 0; i < args->uPipelineBindingCount; ++i) {
+    VkDescriptorBufferInfo *buffers = calloc(pipeline->bufferCount, sizeof(VkDescriptorBufferInfo));
+    for(uint32_t i = 0; i < pipeline->bufferCount; ++i) {
         buffers[i].buffer = pipeline->vulkanBuffers[i];
         buffers[i].offset = 0;
         buffers[i].range = args->pPipelineBindings[i].uBindingElementCount * args->pPipelineBindings[i].uBindingElementSize;
     }
-
-    VkWriteDescriptorSet *descriptorSets = calloc(args->uPipelineBindingCount, sizeof(VkWriteDescriptorSet));
+    
+    VkWriteDescriptorSet *descriptorSetWrites = calloc(pipeline->bufferCount, sizeof(VkWriteDescriptorSet));
     for(uint32_t i = 0; i < args->uPipelineBindingCount; ++i) {
-        descriptorSets[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorSets[i].dstSet = pipeline->vulkanDescriptorSet;
-        descriptorSets[i].dstBinding = i;
-        descriptorSets[i].dstArrayElement = 0;
-        descriptorSets[i].descriptorCount = 1;
-        descriptorSets[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descriptorSets[i].pBufferInfo = &buffers[i];
-        descriptorSets[i].pNext = NULL;
+        //VkWriteDescriptorSet descriptorSetWrites = {};
+        descriptorSetWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorSetWrites[i].pNext = NULL;
+        descriptorSetWrites[i].dstSet = pipeline->vulkanDescriptorSet;
+        descriptorSetWrites[i].dstBinding = i;
+        descriptorSetWrites[i].dstArrayElement = 0;
+        descriptorSetWrites[i].descriptorCount = 1;
+        descriptorSetWrites[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorSetWrites[i].pBufferInfo = &buffers[i];
+        descriptorSetWrites[i].pImageInfo = NULL;
+        descriptorSetWrites[i].pTexelBufferView = NULL;
+        descriptorSetWrites[i].pNext = NULL;
+        //vkUpdateDescriptorSets(ceGetInstanceVulkanDevice(instance), 1,
+        // &descriptorSetWrites, 0, NULL);  
     }
 
-    vkUpdateDescriptorSets(ceGetInstanceVulkanDevice(instance), args->uPipelineBindingCount,
-     descriptorSets, 0, NULL);
-    free(descriptorSets);
+    vkUpdateDescriptorSets(ceGetInstanceVulkanDevice(instance), pipeline->bufferCount,
+     descriptorSetWrites, 0, NULL);
     free(buffers);
+    free(descriptorSetWrites);
     return result;
 }
 
@@ -176,7 +191,7 @@ static VkResult __createVkPipelineLayoutAndCache(CeInstance instance, CePipeline
         .setLayoutCount = 1,
     };
     VkPipelineCacheCreateInfo cacheInfo = {
-        
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
     };
     VkResult result = vkCreatePipelineLayout(ceGetInstanceVulkanDevice(instance), &layoutInfo, NULL, &pipeline->vulkanPipelineLayout);
     vkCreatePipelineCache(ceGetInstanceVulkanDevice(instance), &cacheInfo, NULL, &pipeline->vulkanPipelineCache);
@@ -192,13 +207,14 @@ CeResult ceCreatePipeline(CeInstance instance, const CePipelineCreationArgs * ar
     if(!instance || !args || !pipeline)
         return CE_ERROR_NULL_PASSED;
         
-    ALIAS = malloc(sizeof(struct CePipeline_t));
-    
+    ALIAS = calloc(1, sizeof(struct CePipeline_t));
+    ALIAS->bufferCount = args->uPipelineBindingCount;
+
     if(
         __createVkBuffersFromBindings(instance, args, ALIAS) ||
         __createVkShaderModule(instance, ALIAS, args) ||
+        __createVkDescriptorPool(instance, ALIAS) || 
         __createVkDescriptorSetLayout(instance, ALIAS, args) ||
-        __createVkDescriptorPool(instance, ALIAS, args) || 
         __createVkDescriptorSet(instance, args, ALIAS) ||
         __createVkPipelineLayoutAndCache(instance, ALIAS) ||
         __createVkPipeline(ALIAS))

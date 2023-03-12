@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <vulkan/vulkan_core.h>
 #include "ce-instance-internal.h"
+#include <string.h>
+//#define DEBUG
 
 struct CeInstance_t {
     VkPhysicalDevice vulkanPhysicalDevice;
@@ -15,6 +17,7 @@ struct CeInstance_t {
     uint32_t vulkanQueueFamily;
     uint32_t vulkanQueueCount;
     struct CeInstanceQueueList* queueListHead;
+    VkDebugUtilsMessengerEXT debugMessenger;
 };
 
 struct CeInstanceQueueList {
@@ -30,9 +33,14 @@ static VkResult __createVkCommandPool(CeInstance instance) {
     };
     return vkCreateCommandPool(instance->vulkanDevice, &commandInfo, NULL, &instance->vulkanCommandPool);
 }
+#ifdef DEBUG
+
+#include <signal.h>
+#endif
 
 
 static VkResult __createVkInstance(CeInstance instance, const CeInstanceCreationArgs* args) {
+
     VkInstanceCreateInfo instanceCreateInfo =  {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
     };
@@ -43,8 +51,56 @@ static VkResult __createVkInstance(CeInstance instance, const CeInstanceCreation
         .engineVersion = VK_MAKE_API_VERSION(0, 0, 1, 0),
         .pEngineName = "Compute Engine (VK) 0.1.0",
     };
+
+    #ifdef DEBUG
+    static const char* required_layers[] = {
+        "VK_LAYER_KHRONOS_validation"
+    };
+
+    uint32_t layerCount;
+    vkEnumerateInstanceLayerProperties(&layerCount, NULL);
+    VkLayerProperties *layerProperties = calloc(layerCount, sizeof(VkLayerProperties));
+    vkEnumerateInstanceLayerProperties(&layerCount, layerProperties);
+
+    for(uint32_t i = 0; i < 1; ++i) {
+        VkBool32 layerFound = VK_FALSE;
+        for(uint32_t j = 0; j < layerCount; ++j) {
+            if(strcmp(layerProperties[j].layerName, required_layers[i]) == 0) {
+                layerFound = VK_TRUE;
+                break;
+            }
+        }
+
+        if(!layerFound) {
+            raise(SIGABRT);
+        }
+    }
+    instanceCreateInfo.enabledLayerCount = 1;
+    instanceCreateInfo.ppEnabledLayerNames = required_layers;
+    VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    //createInfo.pfnUserCallback = debugCallback;
+    createInfo.pUserData = NULL;
+
+    #endif
+
+
     instanceCreateInfo.pApplicationInfo = &applicationInfo;
-    return vkCreateInstance(&instanceCreateInfo, NULL, &instance->vulkanInstance);
+    VkResult result = vkCreateInstance(&instanceCreateInfo, NULL, &instance->vulkanInstance);
+    #ifdef DEBUG
+    {
+        PFN_vkCreateDebugUtilsMessengerEXT createFunc = 
+            (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance->vulkanInstance, "vkCreateDebugUtilsMessengerEXT");
+        if(!createFunc)
+            raise(SIGABRT);
+            
+        createFunc(instance->vulkanInstance, &createInfo, NULL, &instance->debugMessenger);
+    }
+    #endif
+
+    return result;
 }
 
 static void __chooseVkDevice(CeInstance instance) {
@@ -111,6 +167,7 @@ static VkResult __createVkDeviceSingle(CeInstance instance) {
     free(queuePriorities);
     return result;
 }
+
 CeResult ceCreateInstance(const CeInstanceCreationArgs * args, CeInstance *instance) {
     if(!args || !instance) 
         return CE_ERROR_NULL_PASSED;
@@ -145,6 +202,17 @@ void ceDestroyInstance(CeInstance instance) {
         free(current);
         current = next;
     }
+
+    #ifdef DEBUG 
+    {
+        PFN_vkDestroyDebugUtilsMessengerEXT destroyFunc = 
+            (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance->vulkanInstance, "vkDestroyDebugUtilsMessengerEXT");
+        if(!destroyFunc)
+            raise(SIGABRT);
+            
+        destroyFunc(instance->vulkanInstance, instance->debugMessenger, NULL);
+    }
+    #endif
 
     vkDestroyCommandPool(instance->vulkanDevice, instance->vulkanCommandPool, NULL);
     vkDestroyDevice(instance->vulkanDevice, NULL);
