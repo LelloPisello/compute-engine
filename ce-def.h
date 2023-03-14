@@ -9,6 +9,8 @@ CE_MAKE_HANDLE(CeInstance)
 CE_MAKE_HANDLE(CePipeline)
 CE_MAKE_HANDLE(CeCommand)
 
+#define DEBUG
+
 #define CE_TRUE 1
 #define CE_FALSE 0
 

@@ -1,3 +1,10 @@
 build/*
 .vscode/
 Makefile
+*.comp
+*.frag
+*.vert
+*.spv
+*.glsl
+*.hlsl
+idea
