@@ -144,4 +144,29 @@ CeCommand command;
 ceBeginCommand(command);
 ```
 To record to a command, use the function ceRecordToCommand.
-The function returns a CeResult and 
+The function returns a CeResult and takes two parameters:
+- a CeCommandRecordingArgs pointer
+- a CeCommand 
+
+Both parameters **must** be valid pointers / handles.
+
+The first parameter points to a CeCommandRecordingArgs structure,
+which contains information about the recording.
+
+The second parameter is the Command to record to.
+
+To end a command recording, use the function ceEndCommand.
+it takes one parameter of type CeCommand, the command whose recording is being stopped.
+
+example:
+```C
+CeCommand command;
+//creation
+ceBeginCommand(command); //begin command recording
+CeCommandRecordingArgs args;
+args.bRecordCommand = CE_FALSE; //this says we are recording a pipeline
+args.pSuppliedPipeline = pipeline; //more about pipelines later
+ceRecordToCommand(&args, command); //record our pipeline to the command
+ceEndCommand(command); //end command recording.
+```
+
