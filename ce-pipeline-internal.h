@@ -17,3 +17,6 @@ ceSetInstanceQueueToBusy(CeInstance, uint32_t queueIndex);
 
 CeResult
 ceSetInstanceQueueToFree(CeInstance, uint32_t queueIndex);
+
+VkSemaphore 
+ceGetPipelineBindingSemaphore(CePipeline);

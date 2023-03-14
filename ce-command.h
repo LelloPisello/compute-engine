@@ -3,6 +3,7 @@
 
 typedef struct {
     CeBool32 bIsSecondaryCommand;
+    uint32_t uMaxCommands;
 } CeCommandCreationArgs;
 
 typedef struct {
@@ -29,10 +30,10 @@ CeResult
 ceWaitCommand(CeInstance, CeCommand);
 
 CeResult
-ceResetCommand(CeCommand);
+ceResetCommand(CeInstance, CeCommand);
 
 CeResult
-ceRunCommand(CeCommand);
+ceRunCommand(CeInstance, CeCommand);
 
 void
 ceDestroyCommand(CeInstance, CeCommand);
