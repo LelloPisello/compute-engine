@@ -15,21 +15,16 @@ The CE workflow is summarized like this:
 - Create an instance of the library
 - Create command buffers to record compute operations to
 - Create pipelines containing compute operations and record them to a command buffer
-- Submit a command buffer
+- Submit the command buffer to your GPU operation queues
 - Destroy everything
 
-CE users only have to worry about very few new types:
+CE users only have to worry about very few new types, including:
 ```C
     CeInstance
     CeCommand
     CePipeline
 ```
-All of these are opaque handle types, and are allocated on the heap via their respective creator functions:
-```C
-    ceCreateInstance
-    ceCreateCommand
-    ceCreatePipeline
-```
+
  By CE's chosen convention we chose to pass all the parameters to function via structure pointers,
  and all the function except destroying function return a CeResult value:
  Every function in CE that requires a large amount of data takes a pointer to a user-filled structure
