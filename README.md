@@ -11,6 +11,13 @@ All you can see is pages of tutorials on OpenGL, OpenCL and Vulkan, so you turn 
 CE can be the solution.
 
 # Simple and clean code
+The CE workflow is summarized like this:
+- Create an instance of the library
+- Create command buffers to record compute operations to
+- Create pipelines containing compute operations and record them to a command buffer
+- Submit a command buffer
+- Destroy everything
+
 CE users only have to worry about very few new types:
 ```C
     CeInstance
