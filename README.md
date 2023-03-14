@@ -1,5 +1,6 @@
+# Compute Engine
 
-### What is Compute Engine?
+## What is Compute Engine?
 **CE is a C library that aims to bring parallel buffer work closer to beginners.**
 Working on big buffers is always time consuming, both for the CPU and the programmer.
 
@@ -9,7 +10,7 @@ About compute shaders.
 All you can see is pages of tutorials on OpenGL, OpenCL and Vulkan, so you turn away.
 CE can be the solution.
 
-## Simple and clean code
+# Simple and clean code
 CE users only have to worry about very few new types:
 ```C
     CeInstance
@@ -45,6 +46,20 @@ All of these are opaque handle types, and are allocated on the heap via their re
 		//handle error
 	}
 ```
+# Installation
+
+Linux:
+```bash
+#download the repo on your machine
+git clone https://github.com/LelloPisello/compute-engine.git
+cd compute-engine
+mkdir build
+make
+sudo make install
+```
+
+# Usage
+
 ## CeResult
 
 CeResult is an enumeration type which represents a function's success/failure,
