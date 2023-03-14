@@ -142,7 +142,7 @@ ceWaitCommand(CeInstance instance, CeCommand command) {
     return CE_SUCCESS;
 }
 
-CeResult ceResetCommand(CeInstance instance, CeCommand command) {
+CeResult ceResetCommand(CeCommand command) {
     if(!command)
         return ceResult(CE_ERROR_NULL_PASSED, "cannot reset command: none passed");
     if(vkResetCommandBuffer(command->commandBuffer, 0)) {

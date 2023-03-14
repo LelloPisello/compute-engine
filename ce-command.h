@@ -30,7 +30,7 @@ CeResult
 ceWaitCommand(CeInstance, CeCommand);
 
 CeResult
-ceResetCommand(CeInstance, CeCommand);
+ceResetCommand(CeCommand);
 
 CeResult
 ceRunCommand(CeInstance, CeCommand);

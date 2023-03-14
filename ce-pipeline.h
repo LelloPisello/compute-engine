@@ -7,10 +7,6 @@ typedef struct {
 } CePipelineBindingInfo;
 
 typedef struct {
-
-} CePipelineUniformInfo;
-
-typedef struct {
     const char* pShaderFilename;
     CePipelineBindingInfo *pPipelineBindings;
     uint32_t uPipelineBindingCount;
