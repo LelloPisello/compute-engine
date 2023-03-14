@@ -45,4 +45,103 @@ All of these are opaque handle types, and are allocated on the heap via their re
 		//handle error
 	}
 ```
+### CeResult
 
+CeResult is an enumeration type which represents a function's success/failure,
+and how that failure was generated.
+**All** functions that do not destroy CE objects or return global variables defined in the library return a CeResult.
+the enumerations are self explanatory.
+
+### CeInstance
+
+the CeInstance is CE's basic building block: it is required to run most commands in CE,
+and internally it represents the library's VK state, plus a few other things.
+
+#### Creation
+
+a CeInstance is created using the ceCreateInstance function, which takes two parameters:
+. a CeInstanceCreationArgs pointer
+. a CeInstance pointer
+and returns a parameter of type CeResult.
+
+the CeInstanceCreationArgs pointer **must** point to a structure of that type, which
+is to be filled with some information, although most of it is optional.
+
+the CeInstance pointer **must** point to a CeInstance variable, which is going to be filled 
+if the function returns successfully.
+
+the function returns CE_SUCCESS if it succeeds (as any other function).
+
+example:
+```C
+CeInstance instance;
+CeInstanceCreationArgs args;
+args.pApplicationName = "test";
+args.uApplicationVersion = 0; //not yet used
+ceCreateInstance(&args, &instance); //creates a CeInstance inside "instance" using CeInstanceCreationArgs "args"
+```
+
+#### Destruction
+
+CeInstances are destroyed using the function ceDestroyInstance,
+the function returns void and takes a single parameter of type CeInstance.
+
+```C
+CeInstance instance;
+//... code ...
+ceDestroyInstance(instance);
+```
+
+Instances **must not** be destroyed before objects created from them have already been destroyed.
+
+#### Usage
+
+CeInstances are used in the creation of most other CE objects, and do not serve a lot of purpose otherwise.
+
+### CeCommand
+
+CeCommands are objects that represents a command buffer: a list of commands which can be run from the GPU
+in an unordered manner.
+
+Commands can be created, recorded, submitted and waited upon.
+
+A command can be either a primary or secondary command.
+
+#### Creation
+
+CeCommands are created in a similar way to CeInstances: using the ceCreateCommand function.
+The function returns a CeResult and take three parameters:
+. a CeInstance
+. a CeCommandCreationArgs pointer
+. a CeCommand pointer
+All of the parameters **must** be valid (non NULL) pointers / handles.
+The CeInstance is used during creation.
+The CeCommandCreationArgs pointer is a pointer to a structure of the same type, which contains the creation parameters.
+The CeCommand pointer is a pointer to a CeCommand handle, which is going to be filled if the function succeeds.
+
+example:
+```C
+CeCommand command;
+CeCommandCreationArgs args;
+args.bIsSecondaryCommand = CE_FALSE; //sets the command type to primary
+ceCreateCommand(instance, &args, &command);
+```
+the function return CE_SUCCESS if it succeeds.
+
+#### Recording
+
+Recording to a command means adding instructions to it.
+There are two types of instructions you can record: 
+. secondary commands
+. compute pipelines
+Users **must** record at most one pipeline to a command, but can record as many buffers as they want.
+
+To begin recording, use the function ceBeginCommand.
+the function returns a CeResult and takes one parameter: a CeCommand.
+```C
+CeCommand command;
+//command creation...
+ceBeginCommand(command);
+```
+To record to a command, use the function ceRecordToCommand.
+The function returns a CeResult and 
