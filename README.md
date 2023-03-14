@@ -1,4 +1,3 @@
-# Compute Engine
 
 ### What is Compute Engine?
 **CE is a C library that aims to bring parallel buffer work closer to beginners.**
