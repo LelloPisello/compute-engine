@@ -60,8 +60,8 @@ and internally it represents the library's VK state, plus a few other things.
 #### Creation
 
 a CeInstance is created using the ceCreateInstance function, which takes two parameters:
-. a CeInstanceCreationArgs pointer
-. a CeInstance pointer
+- a CeInstanceCreationArgs pointer
+- a CeInstance pointer
 and returns a parameter of type CeResult.
 
 the CeInstanceCreationArgs pointer **must** point to a structure of that type, which
@@ -111,9 +111,9 @@ A command can be either a primary or secondary command.
 
 CeCommands are created in a similar way to CeInstances: using the ceCreateCommand function.
 The function returns a CeResult and take three parameters:
-. a CeInstance
-. a CeCommandCreationArgs pointer
-. a CeCommand pointer
+- a CeInstance
+- a CeCommandCreationArgs pointer
+- a CeCommand pointer
 All of the parameters **must** be valid (non NULL) pointers / handles.
 The CeInstance is used during creation.
 The CeCommandCreationArgs pointer is a pointer to a structure of the same type, which contains the creation parameters.
@@ -132,8 +132,8 @@ the function return CE_SUCCESS if it succeeds.
 
 Recording to a command means adding instructions to it.
 There are two types of instructions you can record: 
-. secondary commands
-. compute pipelines
+- secondary commands
+- compute pipelines
 Users **must** record at most one pipeline to a command, but can record as many buffers as they want.
 
 To begin recording, use the function ceBeginCommand.
