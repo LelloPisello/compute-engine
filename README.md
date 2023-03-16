@@ -352,11 +352,23 @@ CePipelineBindingInfo bindings[2];
 bindings[0] = {sizeof(int), 4};
 bindings[1] = {sizeof(int), 10};
 //two bindings, two arrays with element size sizeof(int) and 4 and 10 elements each
-//note: the number of groups working on the array is going to be equal to the size of
-//the largest binding, or the GPU's limit.
+
+//the actual constant data will be stored here
+int actualConstant;
+//this is a live constant, meaning that CE will actually use "actualConstant"'s data, and will not store a copy
+CePipelineConstantInfo constant = {
+	.pData = &actualConstant,
+	.uDataSize = sizeof(actualConstant),
+	.bIsLiveConstant = CE_TRUE
+};
+
 args.pShaderFilename = "shader.spv";
 args.pPipelineBindings = bindings;
 args.uPipelineBindingCount = 2;
+args.pPipelineConstants = &constant;
+args.uPipelineConstantCount = 1;
+//this compute shader will be run on just two work groups
+args.uDispatchGroupCount = 2;
 ceCreatePipeline(instance, &args, &pipeline);
 ```
 
