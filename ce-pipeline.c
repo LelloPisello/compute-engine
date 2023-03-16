@@ -254,9 +254,13 @@ static VkResult __createVkPipelineLayoutAndCache(CeInstance instance, const CePi
         constants[i].offset = accumulatedOffset;
         constants[i].size = args->pPipelineConstants[i].uDataSize;
         constants[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-        pipeline->constantsData[i].pData = calloc(args->pPipelineConstants[i].uDataSize, 1);
+        if(!pipeline->constantsData[i].bIsLiveConstant) {
+            pipeline->constantsData[i].pData = calloc(args->pPipelineConstants[i].uDataSize, 1);
+            memcpy(pipeline->constantsData[i].pData, args->pPipelineConstants[i].pData, args->pPipelineConstants[i].uDataSize);
+        } else {
+            pipeline->constantsData[i].pData = args->pPipelineConstants[i].pData;
+        }
         pipeline->constantsData[i].uDataSize = args->pPipelineConstants[i].uDataSize;
-        memcpy(pipeline->constantsData[i].pData, args->pPipelineConstants[i].pData, args->pPipelineConstants[i].uDataSize);
         pipeline->constantOffsets[i] = accumulatedOffset;
         accumulatedOffset += constants[i].size;
     }
@@ -343,7 +347,8 @@ void ceDestroyPipeline(CeInstance instance, CePipeline pipeline) {
         vkDestroyBuffer(ceGetInstanceVulkanDevice(instance), pipeline->vulkanBuffers[i], NULL);
     }
     for(uint32_t i = 0; i < pipeline->constantCount; ++i) {
-        free(pipeline->constantsData[i].pData);
+        if(!pipeline->constantsData[i].bIsLiveConstant)
+            free(pipeline->constantsData[i].pData);
     }
     free(pipeline->constantsData);
     free(pipeline->constantOffsets);

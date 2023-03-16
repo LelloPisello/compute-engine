@@ -12,6 +12,7 @@ typedef struct {
 typedef struct {
     void* pData;
     uint32_t uDataSize;
+    CeBool32 bIsLiveConstant;
 } CePipelineConstantInfo;
 
 typedef struct {
