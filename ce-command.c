@@ -40,9 +40,17 @@ ceRecordToCommand(const CeCommandRecordingArgs * args, CeCommand command) {
             ceGetPipelineVulkanPipelineLayout(args->pSuppliedPipeline), 0, 1,
             &tempSet, 0, NULL);
 
+        uint32_t pipelineConstantCount = ceGetPipelineConstantCount(args->pSuppliedPipeline);
+        for(uint32_t i = 0; i < pipelineConstantCount; ++i) {
+            uint32_t dataSize, dataOffset;
+            void* pData;
+            ceGetPipelineConstantData(args->pSuppliedPipeline, i, &pData, &dataSize, &dataOffset);
+            vkCmdPushConstants(command->commandBuffer, ceGetPipelineVulkanPipelineLayout(args->pSuppliedPipeline),
+            VK_SHADER_STAGE_COMPUTE_BIT, dataOffset, dataSize, pData);
+        }
 
         vkCmdDispatch(command->commandBuffer, 
-        ceGetPipelineLongestBufferSize(args->pSuppliedPipeline), 1, 1);
+        ceGetPipelineDispatchWorkgroupCount(args->pSuppliedPipeline), 1, 1);
     }
     return CE_SUCCESS;
 }
@@ -97,7 +105,6 @@ ceRunCommand(CeInstance instance, CeCommand command) {
         .commandBufferCount = 1,
         .pCommandBuffers = &command->commandBuffer
     };
-    vkDeviceWaitIdle(ceGetInstanceVulkanDevice(instance));
     if(vkQueueSubmit(command->vulkanQueue, 1, &subInfo, command->commandFence) != VK_SUCCESS)
         return ceResult(CE_ERROR_INTERNAL, "Vk failed to run command");
     return CE_SUCCESS;
@@ -134,7 +141,7 @@ ceWaitCommand(CeInstance instance, CeCommand command) {
         ceGetInstanceVulkanDevice(instance), 1,
         &command->commandFence, VK_TRUE, ~((uint64_t)0));
     //vkWaitForFences(ceGetInstanceVulkanDevice(instance), 1, &command->commandFence, VK_FALSE, ~((uint64_t)0));
-    //vkResetFences(ceGetInstanceVulkanDevice(instance), 1, &command->commandFence);
+    vkResetFences(ceGetInstanceVulkanDevice(instance), 1, &command->commandFence);
     if(result == VK_ERROR_DEVICE_LOST)
         return ceResult(CE_ERROR_INTERNAL, "Vk failed to wait for a fence, device was lost");
     else if(result != VK_SUCCESS)

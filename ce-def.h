@@ -3,6 +3,9 @@ COMPUTEENGINE
 */
 
 #pragma once
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <stdint.h>
 #define CE_MAKE_HANDLE(handlename) typedef struct handlename##_t *handlename;
 CE_MAKE_HANDLE(CeInstance)
@@ -31,6 +34,8 @@ typedef enum {
 
 typedef uint32_t CeBool32;
 
-
+#ifdef __cplusplus
+}
+#endif
 
 

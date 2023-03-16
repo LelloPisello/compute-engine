@@ -10,7 +10,7 @@ VkDescriptorSet ceGetPipelineVulkanDescriptorSet(CePipeline);
 
 VkPipelineLayout ceGetPipelineVulkanPipelineLayout(CePipeline);
 
-uint32_t ceGetPipelineLongestBufferSize(CePipeline);
+uint32_t ceGetPipelineDispatchWorkgroupCount(CePipeline);
 
 CeResult
 ceSetInstanceQueueToBusy(CeInstance, uint32_t queueIndex);
@@ -20,3 +20,9 @@ ceSetInstanceQueueToFree(CeInstance, uint32_t queueIndex);
 
 VkSemaphore 
 ceGetPipelineBindingSemaphore(CePipeline);
+
+uint32_t 
+ceGetPipelineConstantCount(CePipeline);
+
+void
+ceGetPipelineConstantData(CePipeline, uint32_t constant_index, void** pData, uint32_t *uDataSize, uint32_t *uOffset);

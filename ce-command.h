@@ -1,4 +1,7 @@
 #pragma once
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include "ce-def.h"
 
 typedef struct {
@@ -37,3 +40,7 @@ ceRunCommand(CeInstance, CeCommand);
 
 void
 ceDestroyCommand(CeInstance, CeCommand);
+
+#ifdef __cplusplus
+}
+#endif

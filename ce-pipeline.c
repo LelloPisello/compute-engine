@@ -7,6 +7,7 @@
 #include "ce-instance-internal.h"
 #include "ce-pipeline-internal.h"
 #include "ce-error-internal.h"
+#include <string.h>
 
 struct CePipeline_t { 
     VkPipeline vulkanFinishedPipeline;
@@ -20,7 +21,11 @@ struct CePipeline_t {
     VkDeviceMemory *vulkanBufferMemory;
     VkDeviceSize *vulkanBufferMemorySize;
     uint32_t bufferCount;
-    uint32_t longestBufferSize;
+    //uint32_t longestBufferSize;
+    uint32_t dispatchGroupCount;
+    CePipelineConstantInfo* constantsData;
+    uint32_t* constantOffsets;
+    uint32_t constantCount;
 };
 
 VkPipeline ceGetPipelineVulkanPipeline(CePipeline pipeline) {
@@ -35,8 +40,8 @@ VkPipelineLayout ceGetPipelineVulkanPipelineLayout(CePipeline pipeline) {
     return pipeline->vulkanPipelineLayout;
 }
 
-uint32_t ceGetPipelineLongestBufferSize(CePipeline pipeline) {
-    return pipeline->longestBufferSize;
+uint32_t ceGetPipelineDispatchWorkgroupCount(CePipeline pipeline) {
+    return pipeline->dispatchGroupCount;
 }
 
 #include <stdio.h>
@@ -67,6 +72,7 @@ static VkResult __createVkBuffersFromBindings(CeInstance instance, const CePipel
         }
     }
 
+    uint32_t longestBufferSize = 0;
     for(uint32_t i = 0; i < pipeline->bufferCount; ++i) {
         pipeline->vulkanBufferMemorySize[i] = args->pPipelineBindings[i].uBindingElementCount * args->pPipelineBindings[i].uBindingElementSize;
         VkBufferCreateInfo bufferInfo = {
@@ -78,10 +84,10 @@ static VkResult __createVkBuffersFromBindings(CeInstance instance, const CePipel
             .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         };
         
-        pipeline->longestBufferSize = 
-            pipeline->longestBufferSize < args->pPipelineBindings[i].uBindingElementCount ? 
+        longestBufferSize = 
+            longestBufferSize < args->pPipelineBindings[i].uBindingElementCount ? 
             args->pPipelineBindings[i].uBindingElementCount :
-            pipeline->longestBufferSize;
+            longestBufferSize;
         /*bufferInfos[i].pNext = NULL;
         bufferInfos[i].size = args->pPipelineBindings[i].uBindingElementCount * args->pPipelineBindings[i].uBindingElementSize;
         bufferInfos[i].usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
@@ -100,7 +106,8 @@ static VkResult __createVkBuffersFromBindings(CeInstance instance, const CePipel
         vkAllocateMemory(ceGetInstanceVulkanDevice(instance), &allocInfo, NULL, &pipeline->vulkanBufferMemory[i]);
         vkBindBufferMemory(ceGetInstanceVulkanDevice(instance), pipeline->vulkanBuffers[i], pipeline->vulkanBufferMemory[i], 0);
     }
-    
+    if(!pipeline->dispatchGroupCount)
+        pipeline->dispatchGroupCount = longestBufferSize;
     //free(bufferInfos);
     return VK_SUCCESS;  
 }
@@ -237,12 +244,27 @@ static VkResult __createVkDescriptorSet(CeInstance instance, const CePipelineCre
     return result;
 }
 
-static VkResult __createVkPipelineLayoutAndCache(CeInstance instance, CePipeline pipeline) {
-
+static VkResult __createVkPipelineLayoutAndCache(CeInstance instance, const CePipelineCreationArgs* args, CePipeline pipeline) {
+    VkPushConstantRange *constants = calloc(args->uPipelineConstantCount, sizeof(VkPushConstantRange));
+    pipeline->constantsData = calloc(args->uPipelineConstantCount, sizeof(void*));
+    pipeline->constantCount = args->uPipelineConstantCount;
+    pipeline->constantOffsets = calloc(args->uPipelineConstantCount, sizeof(uint32_t));
+    uint32_t accumulatedOffset = 0;
+    for(uint32_t i = 0; i < pipeline->constantCount; ++i) {
+        constants[i].offset = accumulatedOffset;
+        constants[i].size = args->pPipelineConstants[i].uDataSize;
+        constants[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        pipeline->constantsData[i].pData = calloc(args->pPipelineConstants[i].uDataSize, 1);
+        pipeline->constantsData[i].uDataSize = args->pPipelineConstants[i].uDataSize;
+        memcpy(pipeline->constantsData[i].pData, args->pPipelineConstants[i].pData, args->pPipelineConstants[i].uDataSize);
+        pipeline->constantOffsets[i] = accumulatedOffset;
+        accumulatedOffset += constants[i].size;
+    }
     VkPipelineLayoutCreateInfo layoutInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pSetLayouts = &pipeline->vulkanDescriptorSetLayout,
-        
+        .pushConstantRangeCount = pipeline->constantCount,
+        .pPushConstantRanges = constants,
         .setLayoutCount = 1,
     };
     VkPipelineCacheCreateInfo cacheInfo = {
@@ -251,7 +273,21 @@ static VkResult __createVkPipelineLayoutAndCache(CeInstance instance, CePipeline
     };
     VkResult result = vkCreatePipelineLayout(ceGetInstanceVulkanDevice(instance), &layoutInfo, NULL, &pipeline->vulkanPipelineLayout);
     vkCreatePipelineCache(ceGetInstanceVulkanDevice(instance), &cacheInfo, NULL, &pipeline->vulkanPipelineCache);
+    free(constants);
     return result;
+}
+
+
+uint32_t 
+ceGetPipelineConstantCount(CePipeline pipeline) {
+    return pipeline->constantCount;
+}
+
+void
+ceGetPipelineConstantData(CePipeline pipeline, uint32_t constant_index, void** pData, uint32_t *uDataSize, uint32_t *uOffset) {
+    (*pData) = pipeline->constantsData[constant_index].pData;
+    (*uDataSize) = pipeline->constantsData[constant_index].uDataSize;
+    (*uOffset) = pipeline->constantOffsets[constant_index];
 }
 
 static VkResult __createVkPipeline(CeInstance instance, CePipeline pipeline) {
@@ -278,7 +314,7 @@ CeResult ceCreatePipeline(CeInstance instance, const CePipelineCreationArgs * ar
         
     ALIAS = calloc(1, sizeof(struct CePipeline_t));
     ALIAS->bufferCount = args->uPipelineBindingCount;
-    ALIAS->longestBufferSize = 0;
+    ALIAS->dispatchGroupCount = args->uDispatchGroupCount;
 
     VkSemaphoreCreateInfo semInfo = {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
@@ -293,7 +329,7 @@ CeResult ceCreatePipeline(CeInstance instance, const CePipelineCreationArgs * ar
         return ceResult(CE_ERROR_INTERNAL, "failed to create Vk descriptor set layout");
     if(__createVkDescriptorSet(instance, args, ALIAS))
         return ceResult(CE_ERROR_INTERNAL, "failed to create Vk descriptor set");
-    if(__createVkPipelineLayoutAndCache(instance, ALIAS))
+    if(__createVkPipelineLayoutAndCache(instance, args, ALIAS))
         return ceResult(CE_ERROR_INTERNAL, "failed to create Vk pipeline layout and cache");
     if(__createVkPipeline(instance, ALIAS))
         return ceResult(CE_ERROR_INTERNAL, "failed to create Vk pipeline");
@@ -306,6 +342,11 @@ void ceDestroyPipeline(CeInstance instance, CePipeline pipeline) {
         vkFreeMemory(ceGetInstanceVulkanDevice(instance), pipeline->vulkanBufferMemory[i], NULL);
         vkDestroyBuffer(ceGetInstanceVulkanDevice(instance), pipeline->vulkanBuffers[i], NULL);
     }
+    for(uint32_t i = 0; i < pipeline->constantCount; ++i) {
+        free(pipeline->constantsData[i].pData);
+    }
+    free(pipeline->constantsData);
+    free(pipeline->constantOffsets);
     free(pipeline->vulkanBuffers);
     free(pipeline->vulkanBufferMemory);
     free(pipeline->vulkanBufferMemorySize);
