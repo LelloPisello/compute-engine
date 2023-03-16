@@ -54,9 +54,9 @@ Requirements:
 - Clang
 - Vulkan SDK
 - Git
-- Make
+- GNU make
 
-Linux:
+### Linux:
 ```bash
 #download the repo on your machine
 git clone https://github.com/LelloPisello/compute-engine.git
@@ -64,6 +64,17 @@ cd compute-engine
 mkdir build
 make
 sudo make install
+```
+To link against the library on GCC / Clang:
+```bash
+gcc <source_files> -lCE
+#or
+clang <source_files> -lCE
+```
+The library's header files are contained within /usr/include/CE, with the main one being /usr/include/CE/CE.h.
+You should be able to include them like this:
+```C
+#include <CE/CE.h>
 ```
 
 # Usage
