@@ -25,8 +25,8 @@ CE users only have to worry about very few new types, including:
     CePipeline
 ```
 
- By CE's chosen convention we chose to pass all the parameters to function via structure pointers,
- and all the function except destroying function return a CeResult value:
+ By CE's chosen convention we chose to pass most of the parameters to functions via structure pointers,
+ and all the functions except those which destroy or free objects return a CeResult value:
  Every function in CE that requires a large amount of data takes a pointer to a user-filled structure
  That contains all the info the function needs.
  For example:
@@ -178,6 +178,7 @@ CeCommand command;
 //command creation...
 ceBeginCommand(command);
 ```
+
 To record to a command, use the function ceRecordToCommand.
 The function returns a CeResult and takes two parameters:
 - a CeCommandRecordingArgs pointer
@@ -204,6 +205,7 @@ args.pSuppliedPipeline = pipeline; //more about pipelines later
 ceRecordToCommand(&args, command); //record our pipeline to the command
 ceEndCommand(command); //end command recording.
 ```
+
 ### Submission
 
 CeCommands can be submitted to a GPU queue using the function ceRunCommand.
@@ -233,6 +235,7 @@ CeCommand command;
 //command creation, recording and submission
 ceWaitCommand(instance, command); //wait for command completion
 ```
+
 By default the function is going to wait the maximum time allowed by VK.
 
 ### Destruction and Resetting
@@ -293,6 +296,9 @@ typedef struct {
     const char* pShaderFilename;
     CePipelineBindingInfo *pPipelineBindings;
     uint32_t uPipelineBindingCount;
+    CePipelineConstantInfo *pPipelineConstants;
+    uint32_t uPipelineConstantCount;
+    uint32_t uDispatchGroupCount;
 } CePipelineCreationArgs;
 ```
 The pShaderFilename is a string containing the filename of the compiled shader
@@ -301,6 +307,12 @@ Note: the shader's entry point should be "main"
 
 The pPipelineBindings is a pointer to a CePipelineBindingInfo structure array 
 of uPipelineBindingCount elements. It **must** be a valid pointer if uPipelineBindingCount is not 0.
+
+The pPipelineConstants is a pointer to a CePipelineConstantInfo structure array
+of uPipelineConstantCount elements. It **must** be a valid pointer if uPipelineConstantCount is not 0.
+
+The uDispatchGroupCount member is the number of work groups which are going to be dispatched in your shader.
+If set to 0 the shader will run on N workgroups, where N is equal to the pipeline's longest binding's length.
 
 the CePipelineBindingInfo structure is defined like so:
 ```C
@@ -313,6 +325,22 @@ typedef struct {
 The two members of the structure are respectively the size of an element of the buffer and its length.
 The binding number of a buffer are going to be the same as their index as the array passed to the
 CePipelineCreationArgs structure.
+
+the CePipelineConstantInfo structure is defined like so:
+```C
+typedef struct {
+    void* pData;
+    uint32_t uDataSize;
+    CeBool32 bIsLiveConstant;
+} CePipelineConstantInfo;
+```
+The pData member is a pointer to the constant data of size uDataSize you want to pass to your pipeline.
+
+The bIsLiveConstant member is a boolean representing whether the constant should be updated live or should be copied
+to CE's memory and saved. 
+If bIsLiveConstant is set to either CE_TRUE or a non-zero value the data pData points to is used by CE, and should
+not be deallocated before destroying the pipeline/s which uses it. 
+If it is set to either CE_FALSE or 0, CE will create a copy of the constant data and store it.
 
 A sample program might look like this:
 ```C
