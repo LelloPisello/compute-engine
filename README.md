@@ -50,6 +50,12 @@ CE users only have to worry about very few new types, including:
 ```
 # Installation
 
+Requirements:
+- Clang
+- Vulkan SDK
+- Git
+- Make
+
 Linux:
 ```bash
 #download the repo on your machine
