@@ -5,8 +5,11 @@ extern "C" {
 #endif
 
 typedef struct {
-    uint32_t uBindingElementSize;
-    uint32_t uBindingElementCount;
+    uint32_t uElementSize;
+    uint32_t uElementCount;
+    CeBool32 bIsUniform;
+    void* pInitialData;
+    CeBool32 bKeepMapped;
 } CePipelineBindingInfo;
 
 typedef struct {
@@ -17,10 +20,10 @@ typedef struct {
 
 typedef struct {
     const char* pShaderFilename;
-    CePipelineBindingInfo *pPipelineBindings;
-    uint32_t uPipelineBindingCount;
-    CePipelineConstantInfo *pPipelineConstants;
-    uint32_t uPipelineConstantCount;
+    CePipelineBindingInfo *pBindings;
+    uint32_t uBindingCount;
+    CePipelineConstantInfo *pConstants;
+    uint32_t uConstantCount;
     uint32_t uDispatchGroupCount;
 } CePipelineCreationArgs;
 
@@ -32,6 +35,9 @@ ceMapPipelineBindingMemory(CeInstance, CePipeline, uint32_t bindingIndex, void**
 
 void
 ceUnmapPipelineBindingMemory(CeInstance, CePipeline, uint32_t bindingIndex);
+
+CeResult 
+ceGetPipelineBindingMemory(CePipeline, uint32_t bindingIndex, void**);
 
 void
 ceDestroyPipeline(CeInstance, CePipeline);
