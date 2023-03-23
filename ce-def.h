@@ -22,7 +22,8 @@ typedef enum {
     CE_ERROR_GENERIC,
     CE_ERROR_NULL_PASSED,
     CE_ERROR_INVALID_ARG,
-    CE_ERROR_INTERNAL
+    CE_ERROR_INTERNAL,
+    CE_ERROR_BINDING_NOT_MAPPED
 } CeResult;
 
 typedef enum {
