@@ -6,6 +6,8 @@
 
 VkPipeline ceGetPipelineVulkanPipeline(CePipeline);
 
+VkCommandBuffer ceGetPipelineVulkanCommand(CePipeline);
+
 VkDescriptorSet ceGetPipelineVulkanDescriptorSet(CePipeline);
 
 VkPipelineLayout ceGetPipelineVulkanPipelineLayout(CePipeline);
@@ -26,3 +28,7 @@ ceGetPipelineConstantCount(CePipeline);
 
 void
 ceGetPipelineConstantData(CePipeline, uint32_t constant_index, void** pData, uint32_t *uDataSize, uint32_t *uOffset);
+
+
+uint32_t 
+ceGetInstanceNextFreeQueue(CeInstance);

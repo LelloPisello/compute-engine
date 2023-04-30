@@ -6,25 +6,29 @@ extern "C" {
 
 typedef struct {
     CeBool32 bIsSecondaryCommand;
-    uint32_t uMaxCommands;
 } CeCommandCreationArgs;
 
 typedef struct {
     CeBool32 bRecordCommand;
     union {
-        CeCommand pSuppliedCommand;
         CePipeline pSuppliedPipeline;
+        CeCommand pSuppliedCommand;
     };
 } CeCommandRecordingArgs;
-
+/**
+* Create a CE command from a CE instance using some parameters and write its address to a supplied handle.
+* \param instance the instance the command is going to be created from
+* \param args a pointer to a CeCommandCreationArgs structure containing parameters for command creation
+* \param command a pointer to the CeCommand handle that will contain the created Command's address.
+*/
 CeResult 
-ceCreateCommand(CeInstance, const CeCommandCreationArgs*, CeCommand*);
+ceCreateCommand(CeInstance instance, const CeCommandCreationArgs* args, CeCommand* command);
 
 CeResult
 ceBeginCommand(CeCommand);
 
 CeResult
-ceRecordToCommand(const CeCommandRecordingArgs*, CeCommand);
+ceRecordToCommand(const CeCommandRecordingArgs* args, CeCommand);
 
 CeResult
 ceEndCommand(CeCommand);

@@ -27,6 +27,8 @@ struct CePipeline_t {
     CePipelineConstantInfo* constantsData;
     uint32_t* constantOffsets;
     uint32_t constantCount;
+    //all pipelines create a secondary command buffer and that is what is recorded
+    VkCommandBuffer pipelineCommandBuffer;
 };
 
 VkPipeline ceGetPipelineVulkanPipeline(CePipeline pipeline) {
@@ -46,6 +48,47 @@ uint32_t ceGetPipelineDispatchWorkgroupCount(CePipeline pipeline) {
 }
 
 #include <stdio.h>
+
+static VkResult __createCommandBuffer(CeInstance instance, const CePipelineCreationArgs* args, CePipeline pipeline) {
+    VkResult result;
+    VkCommandBufferAllocateInfo commandInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = ceGetInstanceVulkanCommandPool(instance),
+        .level = VK_COMMAND_BUFFER_LEVEL_SECONDARY,
+        .commandBufferCount = 1,
+    };
+    result = vkAllocateCommandBuffers(ceGetInstanceVulkanDevice(instance), &commandInfo, &pipeline->pipelineCommandBuffer);
+    if(result != VK_SUCCESS)
+        return result;
+    VkCommandBufferInheritanceInfo inhInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+        
+    };
+    VkCommandBufferBeginInfo beginInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
+        .pInheritanceInfo = &inhInfo
+    };
+    result = vkBeginCommandBuffer(pipeline->pipelineCommandBuffer, &beginInfo);
+    if(result != VK_SUCCESS)
+        return result;
+    vkCmdBindPipeline(pipeline->pipelineCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->vulkanFinishedPipeline);
+    vkCmdBindDescriptorSets(pipeline->pipelineCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->vulkanPipelineLayout,
+     0, 1, &pipeline->vulkanDescriptorSet, 0, NULL);
+    
+    uint32_t dataOffset = 0;
+    for(uint32_t i = 0; i < pipeline->constantCount; ++i) {
+        vkCmdPushConstants(pipeline->pipelineCommandBuffer, pipeline->vulkanPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, dataOffset, pipeline->constantsData[i].uDataSize, pipeline->constantsData[i].pData);
+        dataOffset += pipeline->constantsData[i].uDataSize;
+    }
+    vkCmdDispatch(pipeline->pipelineCommandBuffer, args->uDispatchGroupCount, 1, 1);
+    result = vkEndCommandBuffer(pipeline->pipelineCommandBuffer);
+    return result;
+}
+
+VkCommandBuffer ceGetPipelineVulkanCommand(CePipeline pipe) {
+    return pipe->pipelineCommandBuffer;
+}
 
 static VkResult __createVkBuffersFromBindings(CeInstance instance, const CePipelineCreationArgs* args, CePipeline pipeline) {
     pipeline->bufferCount = args->uBindingCount;
@@ -361,6 +404,9 @@ CeResult ceCreatePipeline(CeInstance instance, const CePipelineCreationArgs * ar
         return ceResult(CE_ERROR_INTERNAL, "failed to create Vk pipeline layout and cache");
     if(__createVkPipeline(instance, ALIAS))
         return ceResult(CE_ERROR_INTERNAL, "failed to create Vk pipeline");
+    if(!args->bIsPriorityPipeline)
+        if(__createCommandBuffer(instance, args, ALIAS))
+            return ceResult(CE_ERROR_INTERNAL, "failed to create Vk command buffer for a Ce Pipeline");
     return CE_SUCCESS;
 #undef ALIAS
 }
