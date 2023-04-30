@@ -25,6 +25,7 @@ typedef struct {
     CePipelineConstantInfo *pConstants;
     uint32_t uConstantCount;
     uint32_t uDispatchGroupCount;
+    CeBool32 bIsPriorityPipeline;
 } CePipelineCreationArgs;
 
 CeResult 

@@ -1,6 +1,7 @@
 #include "ce-command.h"
 #include "ce-def.h"
 #include "ce-instance.h"
+#include "ce-command.h"
 #include <stdint.h>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
@@ -8,6 +9,7 @@
 #include "ce-instance-internal.h"
 #include "ce-pipeline-internal.h"
 #include "ce-error-internal.h"
+#include "ce-pipeline.h"
 
 struct CeCommand_t {
     VkQueue vulkanQueue;
@@ -19,8 +21,8 @@ struct CeCommand_t {
 
 
 CeResult 
-ceRecordToCommand(const CeCommandRecordingArgs * args, CeCommand command) {
-    if(!args || !command)
+ceRecordToCommand(const CeCommandRecordingArgs* args, CeCommand command) {
+    if(!args || !command || !args)
         return ceResult(CE_ERROR_NULL_PASSED, "cannot record to command: none passed");
     if(!args->bRecordCommand && !args->pSuppliedPipeline) 
         return ceResult(CE_ERROR_INVALID_ARG, "cannot record pipeline: none passed");
@@ -28,29 +30,27 @@ ceRecordToCommand(const CeCommandRecordingArgs * args, CeCommand command) {
         return ceResult(CE_ERROR_INVALID_ARG, "cannot record secondary command: none passed");
     if(args->bRecordCommand) {
         vkCmdExecuteCommands(command->commandBuffer, 1, &args->pSuppliedCommand->commandBuffer);
+    } else if(ceGetPipelineVulkanCommand(args->pSuppliedPipeline)) {
+        VkCommandBuffer pipeBuf = ceGetPipelineVulkanCommand(args->pSuppliedPipeline);
+        vkCmdExecuteCommands(command->commandBuffer, 1, &pipeBuf);    
     } else {
+        vkCmdBindPipeline(command->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, ceGetPipelineVulkanPipeline(args->pSuppliedPipeline));
+        VkDescriptorSet pipeDescSet = ceGetPipelineVulkanDescriptorSet(args->pSuppliedPipeline);
+        vkCmdBindDescriptorSets(command->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, ceGetPipelineVulkanPipelineLayout(args->pSuppliedPipeline), 0, 1,
+         &pipeDescSet, 0, NULL);
         
-        vkCmdBindPipeline(command->commandBuffer, 
-        VK_PIPELINE_BIND_POINT_COMPUTE, ceGetPipelineVulkanPipeline(args->pSuppliedPipeline));
-        VkPipelineStageFlags waitInfo = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-        VkDescriptorSet tempSet = ceGetPipelineVulkanDescriptorSet(args->pSuppliedPipeline);
-
-        vkCmdBindDescriptorSets(command->commandBuffer,
-            VK_PIPELINE_BIND_POINT_COMPUTE, 
-            ceGetPipelineVulkanPipelineLayout(args->pSuppliedPipeline), 0, 1,
-            &tempSet, 0, NULL);
-
-        uint32_t pipelineConstantCount = ceGetPipelineConstantCount(args->pSuppliedPipeline);
-        for(uint32_t i = 0; i < pipelineConstantCount; ++i) {
-            uint32_t dataSize, dataOffset;
-            void* pData;
-            ceGetPipelineConstantData(args->pSuppliedPipeline, i, &pData, &dataSize, &dataOffset);
-            vkCmdPushConstants(command->commandBuffer, ceGetPipelineVulkanPipelineLayout(args->pSuppliedPipeline),
-            VK_SHADER_STAGE_COMPUTE_BIT, dataOffset, dataSize, pData);
+        const uint32_t constantCount = ceGetPipelineConstantCount(args->pSuppliedPipeline);
+        for(uint32_t i = 0; i < constantCount; ++i) {
+            uint32_t dataOffset;
+            CePipelineConstantInfo constInfo;
+            ceGetPipelineConstantData(args->pSuppliedPipeline, 
+            i, &constInfo.pData, &constInfo.uDataSize, &dataOffset);
+            vkCmdPushConstants(command->commandBuffer, 
+            ceGetPipelineVulkanPipelineLayout(args->pSuppliedPipeline), VK_SHADER_STAGE_COMPUTE_BIT, dataOffset, constInfo.uDataSize, constInfo.pData);
         }
-
         vkCmdDispatch(command->commandBuffer, 
-        ceGetPipelineDispatchWorkgroupCount(args->pSuppliedPipeline), 1, 1);
+        ceGetPipelineDispatchWorkgroupCount(args->pSuppliedPipeline),
+         1, 1);
     }
     return CE_SUCCESS;
 }
